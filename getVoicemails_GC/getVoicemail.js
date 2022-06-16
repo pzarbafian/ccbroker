@@ -1,11 +1,14 @@
 const http = require("https");
+const https = require('https');
 const querystring = require('querystring');
+const fs = require('fs');
 const platformClient = require("purecloud-platform-client-v2");
 const client = platformClient.ApiClient.instance;
 const conversations = [];
 let voicemessageId = "";
 let token_type = "";
 let access_token = "";
+const voicemailUris = [];
 const getVoicemail = () => {
   const clientId = "00cd1850-dfa8-4312-a314-48e7b728429f";
   const clientSecret = "pDViNxJlLaNOgdv29pUwH07XXIckK4KAEcTfiLWoH24";
@@ -25,7 +28,7 @@ const getVoicemail = () => {
   //api call
 
   const getVoicemailUrl = (voicemessageId) => {
-
+    const access_token= "eVNiv8EfWE-Fe787IvhRYZ_rpHtl4MAeOfTj_EtGMpa5b93zjnDdAIEuqyTAZpTz-h_bApQz-8J9Od7dxZ8erA"
     client.setEnvironment(platformClient.PureCloudRegionHosts.ca_central_1); // Genesys Cloud region
 
     // Manually set auth token or use loginImplicitGrant(...) or loginClientCredentialsGrant(...)
@@ -36,13 +39,17 @@ const getVoicemail = () => {
 
     let messageId = voicemessageId; // String | Message ID
     let opts = { 
-      "formatId": "WEBM" // String | The desired media format.
+      "formatId": "WAV" // String | The desired media format.
     };
 
     // Get media playback URI for this voicemail message
     apiInstance.getVoicemailMessageMedia(messageId, opts)
       .then((data) => {
-        console.log(`getVoicemailMessageMedia success! data: ${JSON.stringify(data, null, 2)}`);
+        voicemailUris.push(data.mediaFileUri)
+        if(voicemailUris[1]) {
+          downloadVoicemail(voicemailUris[1])
+        // console.log(`getVoicemailMessageMedia success! data: ${voicemailUris[1]}`);
+        }
       })
       .catch((err) => {
         console.log("There was a failure calling getVoicemailMessageMedia");
@@ -50,6 +57,28 @@ const getVoicemail = () => {
       });
   }
   
+  const downloadVoicemail = (url) =>{
+    // fs.readdir('voicemails', (err, files) => {
+    //   if (err) {
+    //     console.log(err);
+    //   }
+    //   if(files.length) {
+    //     fs.unlink('voicemails/voicemail.WEBM', (err) => {
+    //       if (err) {
+    //         console.log(err);
+    //       }
+    //     });
+    //   }
+    // })
+    
+   https.get(url, resp => resp.pipe(fs.createWriteStream('voicemails/voicemail.WAV')));
+   fs.watch('voicemails', (eventType, filename) => {
+      if (filename) {
+        
+        console.log(`${filename} created!!!`)
+      }
+   })
+  }
   const makeNextRequest = (body) => {
     token_type = body.token_type;
     access_token = body.access_token;
@@ -74,7 +103,6 @@ const getVoicemail = () => {
           })
         }
         voicemessageId = conversations[0].id;
-        console.log(voicemessageId)
         getVoicemailUrl(voicemessageId);
       });
     });

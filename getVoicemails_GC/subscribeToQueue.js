@@ -42,6 +42,7 @@ websocketClient.on('connect', connection => {
                 console.log(`voicemail has accepted conversation with ${customer.id}`);
             }
             if(voicemail?.endTime){
+                voice.getVoicemail();
                 console.log(`Customer ${customer.id} disconnected from conversation`);
             }
         }

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+
+	<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+	<script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
+	<script src="https://sdk-cdn.mypurecloud.com/javascript/0.84.8/purecloud-api.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/q.js/1.4.1/q.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.3/FileSaver.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip-utils/0.0.2/jszip-utils.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.1.3/js.cookie.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.17.1/moment.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.11/moment-timezone-with-data.min.js"></script>
+
+	<script type="text/javascript">
+		const cookieName = 'voicemailviewersettings';
+		var environment = "cac1.pure.cloud";
+		var clientId = '00cd1850-dfa8-4312-a314-48e7b728429f';
+		// var redirectUrl = "https://storage.googleapis.com/connex_geflib/logintest/voicemail.html";
+		var settingsCookie = Cookies.get(cookieName);
+
+		if (!settingsCookie)
+			settingsCookie = {
+				environment: 'https://apps.cac1.pure.cloud',
+				clientId: '00cd1850-dfa8-4312-a314-48e7b728429f'
+			};
+		else
+			settingsCookie = JSON.parse(settingsCookie);
+
+		if (environment)
+			settingsCookie.environment = environment;
+		else 
+			environment = settingsCookie.environment;
+
+		if (clientId)
+			settingsCookie.clientId = clientId;
+		else
+			clientId = settingsCookie.clientId;
+
+		Cookies.set(cookieName, settingsCookie);
+
+		const pureCloudSession = purecloud.platform.PureCloudSession({
+			timeout: 20000,
+			strategy: 'implicit',
+			clientId: clientId,
+			redirectUrl: 'http://localhost:8080/oauth/callback',
+			// redirectUrl: redirectUrl,
+			environment: environment
+		});
+		// access_token=hBgZnsMcJYaR5qy2o9PDslc0S882ZYC9hmAbj8YMuTsOM3CJDdjXZkUxygc1iaQIqfxcis4woye-TE2c53Hpjw
+		// &expires_in=86399
+		// &token_type=bearer
+		const voicemailApi = new purecloud.platform.VoicemailApi(pureCloudSession);
+		const usersApi = new purecloud.platform.UsersApi(pureCloudSession);
+		const zip = new JSZip();
+		const recordingFormat = 'WAV';
+		const filenameRegex = /[^a-z0-9\.\+-\s]/gi;
+
+		var _me;
+		var voicemails = {};
+		var mediaProcessingCount = 0;
+
+		pureCloudSession.login()
+			.then(() => {
+				return usersApi.getMe();
+			})
+			.then((me) => {
+				_me = me;
+				console.log(`Welcome ${me.name}`);
+
+				$('#username').text(me.name);
+
+				return getMessages();
+			})
+			.then((messages) => {
+				_.forEach(messages, function(message) {
+					voicemails[message.id] = message;
+					var createdDate = moment(message.createdDate).tz(moment.tz.guess());
+
+					// Determine file name
+					voicemails[message.id].mediaFileName = createdDate.format('YYYY-MM-DD hh.mm.ss a z');
+					if (message.callerName)
+						voicemails[message.id].mediaFileName += ` ${message.callerName}`;
+					voicemails[message.id].mediaFileName += ` ${message.callerAddress}`;
+					voicemails[message.id].mediaFileName += `.${recordingFormat.toLowerCase()}`;
+					voicemails[message.id].mediaFileName = voicemails[message.id].mediaFileName.replace(filenameRegex, '_');
+
+					// Add row
+					var row = `<tr${message.read ? '' : ' class="info"'}>`;
+					row += `<td class="text-center"><input type="checkbox" name="download" value="${message.id}" /></td>`;
+					row += `<td class="text-center">${message.read ? '<span class="glyphicon glyphicon-eye-open" aria-hidden="true"></span>' : '<span class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>'}</td>`;
+					row += `<td>${createdDate.format('YYYY-M-D h:m a z')}</td>`;
+					if (message.callerName)
+						row += `<td>${message.callerName} (${message.callerAddress})</td>`;
+					else
+						row += `<td>${message.callerAddress}</td>`;
+					row += `<td id="media-${message.id}"></td>`;
+					row += '</tr>';
+					$('#voicemailTable').append(row);
+
+					// Lazy add media to row
+					mediaProcessingCount++;
+					getMedia(message.id, recordingFormat)
+						.then((media) => {
+							mediaProcessingCount--;
+							voicemails[message.id].mediaFileUri = media.mediaFileUri;
+							$(`#media-${message.id}`).html(`<audio controls><source src="${media.mediaFileUri}" type="audio/webm"></audio>`);
+						})
+						.catch((err) => {
+							console.log(err);
+							alert(err);
+						});
+				});
+
+				checkMediaFinished();
+			})
+			.catch((err) => {
+				console.log(err);
+				alert(err);
+			});
+
+		function checkMediaFinished() {
+			console.log(`mediaProcessingCount: ${mediaProcessingCount}`);
+			if (mediaProcessingCount > 0)
+				setTimeout(checkMediaFinished, 1000);
+			else
+				$('#downloadRecordingsButton').removeAttr('disabled');
+		}
+
+		function getMessages(page, aggregateResults, deferred) {
+			if (!deferred)
+				deferred = Q.defer();
+
+			if (!page)
+				page = 1;
+
+			voicemailApi.getMeMessages(50, page)
+				.then((results) => {
+					// Aggregate results
+					if (!aggregateResults)
+						aggregateResults = results;
+					else
+						aggregateResults.entities.push.apply(aggregateResults.entities, results.entities);
+
+					console.log(`getMeMessages returned ${results.entities.length} results, total is now ${aggregateResults.entities.length}`);
+
+					// Done?
+					if (results.selfUri !== undefined && results.selfUri == results.lastUri) {
+						deferred.resolve(aggregateResults.entities);
+						return;
+					}
+
+					// Get more
+					page++;
+					getMessages(page, aggregateResults, deferred);
+				})
+				.catch((err) => {
+					if (retryOnError(err, function(){getMessages(page, aggregateResults, deferred);})) 
+						return;
+
+					deferred.reject(err);
+				});
+
+			return deferred.promise;
+		}
+
+		function getMedia(messageId, format, deferred) {
+			if (!deferred)
+				deferred = Q.defer();
+
+			voicemailApi.getMessagesMessageIdMedia(messageId, format)
+				.then((result) => {
+					deferred.resolve(result);
+				})
+				.catch((err) => {
+					if (retryOnError(err, function(){getMedia(messageId,format, deferred);})) 
+						return;
+
+					deferred.reject(err);
+				});
+
+			return deferred.promise;
+		}
+
+		function retryOnError(error, retryFunction) {
+			// Default to wait a second before retrying
+			var sleepMs = 1000;
+			var msg = '';
+
+			// Check for retryable status codes. 
+			// Set sleepMs to whatever is appropriate for the code.
+			// Anything falling to default will be considered unable to be retried
+			switch(error.status) {
+				case 429: {
+					// Get remaining seconds, convert to milliseconds, and add 1 second for good measure
+					sleepMs = (error.response.header['inin-ratelimit-reset'] * 1000) + 1000;
+					msg = `API RATE LIMITED! Sleeping for ${sleepMs/1000} seconds before retrying`;
+					console.log(msg);
+					alert(msg);
+					break;
+				}
+				case 504: {
+					// Set timeout to 10 seconds. 504s usually take a few seconds to clear up.
+					sleepMs = 10 * 1000;
+					msg = `API 504 Gateway Timeout - Sleeping for ${sleepMs/1000} seconds before retrying`;
+					console.log(msg);
+					alert(msg);
+					break;
+				}
+				default: {
+					return false;
+				}
+			}
+
+			// Just do it, later
+			setTimeout(retryFunction, sleepMs);
+
+			// Let the caller know the API call will be retried
+			return true;
+		}
+
+		function toggleCheckboxes() {
+			var checkboxes = $(':checkbox');
+			var checked = checkboxes.length > 0 ? !checkboxes.first().prop('checked') : true;
+
+			checkboxes.each(function(i) {
+				$(this).prop('checked', checked);
+			});
+		}
+
+		/* functions downloadRecordings and urlToPromise derived from examples:
+		 * https://stuk.github.io/jszip/documentation/examples/downloader.html
+		 * https://stuk.github.io/jszip/documentation/examples/downloader.js
+		 */
+		function downloadRecordings() {
+        	// find every checked item
+			$(':checkbox:checked').each(function(i) {
+	            var $this = $(this);
+	            var url = voicemails[$this.val()].mediaFileUri;
+	            var filename = voicemails[$this.val()].mediaFileName;
+	            zip.file(filename, urlToPromise(url), {binary:true});
+			});
+
+			// when everything has been downloaded, we can trigger the dl
+	        zip.generateAsync({type:"blob"}, function updateCallback(metadata) {
+	        	updateProgressBar(metadata.percent);
+	        })
+	        .then(function callback(blob) {
+	        	console.log('saving zip!');
+	            // see FileSaver.js
+	            saveAs(blob, "voicemails.zip");
+	        }, function (e) {
+	        	console.log(e);
+	        });
+		}
+
+		function urlToPromise(url) {
+	        return new Promise(function(resolve, reject) {
+	            JSZipUtils.getBinaryContent(url, function (err, data) {
+	                if(err) {
+	                    reject(err);
+	                } else {
+	                    resolve(data);
+	                }
+	            });
+	        });
+	    }
+
+		function getParameterByName(name, url) {
+			if (!url) {
+				url = window.location.href;
+			}
+			name = name.replace(/[\[\]]/g, "\\$&");
+			var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+				results = regex.exec(url);
+			if (!results) return undefined;
+			if (!results[2]) return '';
+			return decodeURIComponent(results[2].replace(/\+/g, " "));
+		}
+
+		function updateProgressBar(percent) {
+			// Truncate after decimal
+			percent = percent|0;
+
+			// Update UI
+			$('#progressBarContent').css('width', `${percent}%`).attr('aria-valuenow', percent); 
+			$('#progressBarLabel').text(`${percent}%`);
+
+			if (percent <= 0 || percent >= 100){
+				$('#progressBarContent').removeClass('active progress-bar-striped');
+				$('#downloadRecordingsButton').removeAttr('disabled');
+			} else {
+				$('#progressBar').removeClass('hidden');
+				$('#progressBarContent').addClass('active progress-bar-striped');
+				$('#downloadRecordingsButton').attr('disabled', 'disabled');
+			}
+		}
+	</script>
+</head>
+<body class="container-fluid">
+
+<div class="row">
+	<div class="col-md-12">
+		<h1>Voicemails for <span id="username"></span></h1>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-md-4">
+		<button id="downloadRecordingsButton" onclick="downloadRecordings()" class="btn btn-default btn-block" disabled="disabled">Download Selected Voicemails</button>
+	</div>
+	<div class="col-md-8">
+		<div id="progressBar" class="progress hidden">
+		  <div id="progressBarContent" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;width: 0%">
+		  	<span id="progressBarLabel">0%</span>
+		  </div>
+		</div>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-md-12">
+		<table class="table table-striped" id="voicemailTable">
+			<tr>
+				<th class="text-center">Download? [<a href="#" onclick="toggleCheckboxes()">toggle all</a>]</th>
+				<th class="text-center">Read</th>
+				<th>Date</th>
+				<th>Caller</th>
+				<th>Playback Controls</th>
+			</tr>
+		</table>
+	</div>
+</div>
+
+
+
+</body>
+</html>
