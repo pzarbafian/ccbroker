@@ -1,7 +1,6 @@
 require('dotenv').config();
 const fetch = require("node-fetch");
 const fs = require('fs');
-const {download} = require('./download');
 let transcript_id = "";
 const upload = () => {
   const url = "https://api.assemblyai.com/v2/upload";
@@ -69,4 +68,4 @@ const upload = () => {
   
 
 upload();
-module.exports = { transcribe };
+module.exports = { transcript_id };
