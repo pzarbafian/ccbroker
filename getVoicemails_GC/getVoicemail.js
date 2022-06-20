@@ -28,7 +28,7 @@ const getVoicemail = () => {
   //api call
 
   const getVoicemailUrl = (voicemessageId) => {
-    const access_token= "eVNiv8EfWE-Fe787IvhRYZ_rpHtl4MAeOfTj_EtGMpa5b93zjnDdAIEuqyTAZpTz-h_bApQz-8J9Od7dxZ8erA"
+    const access_token= "uKuJQHzqJRItPRpz1779r1do1iruhTMQO-ksea9TQ2A6RpZ0Ax9WhCeTl0DVWcqC3wIJyOHG3YkpDwm7DyRm6Q&"
     client.setEnvironment(platformClient.PureCloudRegionHosts.ca_central_1); // Genesys Cloud region
 
     // Manually set auth token or use loginImplicitGrant(...) or loginClientCredentialsGrant(...)

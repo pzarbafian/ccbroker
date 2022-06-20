@@ -2,8 +2,8 @@ require('dotenv').config();
 const fetch = require("node-fetch");
 const fs = require('fs');
 const {download} = require('./download');
+let transcript_id = "";
 const upload = () => {
-  let audioUrl = "";
   const url = "https://api.assemblyai.com/v2/upload";
   
   let args = process.argv.slice(2);
@@ -30,6 +30,7 @@ const upload = () => {
           console.log(data)
           console.log(`URL: ${data['upload_url']}`)
           transcribe(data['upload_url']);
+          
         })
         .catch((error) => {
           console.error(`Error: ${error}`);
@@ -38,7 +39,6 @@ const upload = () => {
   }  
 
   const transcribe = (audioUrl) => {
-    let id = "";
     const url = "https://api.assemblyai.com/v2/transcript";
     const data = {
       "audio_url": audioUrl
@@ -58,11 +58,14 @@ const upload = () => {
         console.log('Success:', data);
         console.log('ID:', data['id']);
         // download(data['id']);
+        transcript_id = data['id']
+        return transcript_id;
       })
       .catch((error) => {
         console.error('Error:', error);
       });
-  }
+
+    }
   
 
 upload();

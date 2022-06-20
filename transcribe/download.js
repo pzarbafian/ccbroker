@@ -1,11 +1,11 @@
 require('dotenv').config();
 const fetch = require('node-fetch');
 
-const download = (audioId) => {
+const download = (transcript_id) => {
 
   let args = process.argv.slice(2);
-  // let id = audioId;
-  let id = args[0];
+  let id = transcript_id;
+  // let id = args[0];
   const url = `https://api.assemblyai.com/v2/transcript/${id}`;
   
   const params = {
