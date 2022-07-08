@@ -19,14 +19,17 @@
 	<script type="text/javascript">
 		const cookieName = 'voicemailviewersettings';
 		var environment = "cac1.pure.cloud";
-		var clientId = '00cd1850-dfa8-4312-a314-48e7b728429f';
+		// var clientId = '00cd1850-dfa8-4312-a314-48e7b728429f';
+		const clientId = 'a8e066f6-5706-464b-a37c-420bee220834'
+
 		// var redirectUrl = "https://storage.googleapis.com/connex_geflib/logintest/voicemail.html";
 		var settingsCookie = Cookies.get(cookieName);
 
 		if (!settingsCookie)
 			settingsCookie = {
 				environment: 'https://apps.cac1.pure.cloud',
-				clientId: '00cd1850-dfa8-4312-a314-48e7b728429f'
+				// clientId: '00cd1850-dfa8-4312-a314-48e7b728429f'
+				clientId: 'a8e066f6-5706-464b-a37c-420bee220834'
 			};
 		else
 			settingsCookie = JSON.parse(settingsCookie);
@@ -47,7 +50,7 @@
 			timeout: 20000,
 			strategy: 'implicit',
 			clientId: clientId,
-			redirectUrl: 'http://localhost:8080/oauth/callback',
+			redirectUrl: 'http://localhost:8085/oauth/callback',
 			// redirectUrl: redirectUrl,
 			environment: environment
 		});

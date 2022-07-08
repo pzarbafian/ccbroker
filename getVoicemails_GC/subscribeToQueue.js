@@ -3,20 +3,19 @@ var WebSocketClient = require('websocket').client;
 const client = platformClient.ApiClient.instance;
 const voice = require('./getVoicemail')
 require('dotenv').config();
+
 // Get client credentials from environment variables
 const CLIENT_ID = process.env.GENESYS_CLOUD_CLIENT_ID;
 const CLIENT_SECRET = process.env.GENESYS_CLOUD_CLIENT_SECRET;
 const ORG_REGION = process.env.GENESYS_CLOUD_REGION; // eg. us_east_1
 
 const websocketClient = new WebSocketClient();
-
 // API instances
 const notificationsApi = new platformClient.NotificationsApi();
-
 // Additional configuration variables
 const queueId = 'b8544dae-74dd-4c0f-b4bb-c3b3d2992558';
 const subscriptionTopic = `v2.routing.queues.${queueId}.conversations`;
-
+let disconnected = false;
 // Define the callbacks for the websocket listener
 websocketClient.on('connect', connection => {
     console.log('WebSocket client connected and listening...');
@@ -24,7 +23,6 @@ websocketClient.on('connect', connection => {
         let data = JSON.parse(message.utf8Data);
         let topic = data.topicName;
         let eventBody = data.eventBody;
-
         if(topic == subscriptionTopic){
             let conversation = eventBody;
             let customer = conversation.participants
@@ -32,26 +30,30 @@ websocketClient.on('connect', connection => {
             let voicemail = conversation.participants
                             .filter(p => p.purpose == 'voicemail')[0];
             // Some messages based on events that are happening on the queue
+            // console.log(customer)
             if(customer && !voicemail){
                 console.log(`Customer ${customer.id} is waiting on queue.`);
             }
-            // if(voicemail && !voicemail.connectedTime){
-            //     console.log(`voicemail ${voicemail.name} is being alerted for customer ${customer.id}`);
-            // }
             if(voicemail && voicemail.connectedTime){
                 console.log(`voicemail has accepted conversation with ${customer.id}`);
             }
-            if(voicemail?.endTime){
-                voice.getVoicemail();
-                console.log(`Customer ${customer.id} disconnected from conversation`);
+            if(voicemail?.endTime && customer.calls[0].disconnectedTime){
+                    console.log(`Customer ${customer.id} disconnected from conversation`);
+                    disconnected = true;
             }
         }
 
+        
         // For heartbeats
         if(topic == 'channel.metadata'){
-            console.log(eventBody.message);
+            if(disconnected) {
+                voice.getVoicemail();
+                disconnected = false;
+            }
+            console.log("Heart Beat")
         }
     });
+   
 });
 
 
@@ -93,4 +95,4 @@ client.loginClientCredentialsGrant(CLIENT_ID, CLIENT_SECRET)
 
 // NOTE: This next line is a simple way to make sure the app runs 'forever'
 // In production you'd want the actual code running as a process/service
-setInterval(() => {}, 1 << 30);
+// setInterval(() => {}, 1 << 30);

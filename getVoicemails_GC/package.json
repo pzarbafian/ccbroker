@@ -3,6 +3,7 @@
     "axios": "^0.27.2",
     "dotenv": "^16.0.1",
     "node-fetch": "^3.2.4",
+    "open": "^8.4.0",
     "purecloud-platform-client-v2": "^137.0.1",
     "websocket": "^1.0.34"
   },

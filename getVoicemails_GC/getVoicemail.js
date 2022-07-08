@@ -1,8 +1,9 @@
 const http = require("https");
 const https = require('https');
-const querystring = require('querystring');
+// const querystring = require('querystring');
 const fs = require('fs');
 const platformClient = require("purecloud-platform-client-v2");
+const { upload } = require("../transcribe/upload");
 const client = platformClient.ApiClient.instance;
 const conversations = [];
 let voicemessageId = "";
@@ -14,7 +15,7 @@ const getVoicemail = () => {
   const clientSecret = "pDViNxJlLaNOgdv29pUwH07XXIckK4KAEcTfiLWoH24";
   const authUri = "login.cac1.pure.cloud";
   const apiUri = "api.cac1.pure.cloud";
-  
+
   const options = {
     'method': 'POST',
     'hostname': authUri,
@@ -28,17 +29,17 @@ const getVoicemail = () => {
   //api call
 
   const getVoicemailUrl = (voicemessageId) => {
-    const access_token= "uKuJQHzqJRItPRpz1779r1do1iruhTMQO-ksea9TQ2A6RpZ0Ax9WhCeTl0DVWcqC3wIJyOHG3YkpDwm7DyRm6Q"
+    const access_token = "lsxXkMiOcGjHKH1JVfejLHcdKGWAzWVI0CE-CoetIPyhWzcLASq_3TSbREtA4Cl1bFzVxVjuk5OaBMFV4Db-Ow"
     client.setEnvironment(platformClient.PureCloudRegionHosts.ca_central_1); // Genesys Cloud region
 
     // Manually set auth token or use loginImplicitGrant(...) or loginClientCredentialsGrant(...)
     client.setAccessToken(access_token);
-    
+
 
     let apiInstance = new platformClient.VoicemailApi();
 
     let messageId = voicemessageId; // String | Message ID
-    let opts = { 
+    let opts = {
       "formatId": "WAV" // String | The desired media format.
     };
 
@@ -46,55 +47,52 @@ const getVoicemail = () => {
     apiInstance.getVoicemailMessageMedia(messageId, opts)
       .then((data) => {
         voicemailUris.push(data.mediaFileUri)
-        if(voicemailUris[1]) {
-          downloadVoicemail(voicemailUris[1])
-        // console.log(`getVoicemailMessageMedia success! data: ${voicemailUris[1]}`);
+        if (voicemailUris[0]) {
+          downloadVoicemail(voicemailUris[0])
         }
       })
       .catch((err) => {
         console.log("There was a failure calling getVoicemailMessageMedia");
         console.error(err);
       });
+
+    return true
   }
-  
-  const downloadVoicemail = (url) =>{
-    // fs.readdir('voicemails', (err, files) => {
-    //   if (err) {
-    //     console.log(err);
-    //   }
-    //   if(files.length) {
-    //     fs.unlink('voicemails/voicemail.WEBM', (err) => {
-    //       if (err) {
-    //         console.log(err);
-    //       }
-    //     });
-    //   }
-    // })
-    
-   https.get(url, resp => resp.pipe(fs.createWriteStream('voicemails/voicemail.WAV')));
-   fs.watch('voicemails', (eventType, filename) => {
-      if (filename) {
-        
-        console.log(`${filename} created!!!`)
+
+  const downloadVoicemail = (url) => {
+
+    https.get(url, resp => resp.pipe(fs.createWriteStream(`voicemails/${voicemessageId}.WAV`)));
+    fs.readFile('voicemails.json', (err, data) => {
+      const voicemails = JSON.parse(data);
+      const filenames = fs.readdirSync('voicemails');
+      for (const filename of filenames) {
+        if (!voicemails['filenames'].includes(filename)) {
+          voicemails['filenames'].push(filename)
+        }
       }
-   })
+      fs.writeFileSync('voicemails.json', JSON.stringify(voicemails), (err, data) => {
+      })
+    });
+
   }
-  const makeNextRequest = (body) => {
-    token_type = body.token_type;
-    access_token = body.access_token;
+
+  const getMessageId = (body) => {
+    // token_type = body.token_type;
+    // access_token = body.access_token;
+    access_token = 'lsxXkMiOcGjHKH1JVfejLHcdKGWAzWVI0CE-CoetIPyhWzcLASq_3TSbREtA4Cl1bFzVxVjuk5OaBMFV4Db-Ow';
     options.method = 'GET',
-    options.hostname = apiUri,
-    options.path = '/api/v2/voicemail/queues/b8544dae-74dd-4c0f-b4bb-c3b3d2992558/messages',
-    options.headers = {
-      'authorization': body.token_type + ' ' + body.access_token,
-      'content-type': 'application/json' 
-    }
+      options.hostname = apiUri,
+      options.path = '/api/v2/voicemail/queues/b8544dae-74dd-4c0f-b4bb-c3b3d2992558/messages',
+      options.headers = {
+        'authorization': 'bearer' + ' ' + access_token,
+        'content-type': 'application/json'
+      }
     const req = http.request(options, (res) => {
       const chunks = [];
       res.on('data', (chunk) => chunks.push(chunk));
       res.on('end', () => {
         const body = JSON.parse(Buffer.concat(chunks));
-        for(const entity of body.entities) {
+        for (const entity of body.entities) {
           conversations.push({
             id: entity.id,
             conversation: entity.conversation,
@@ -103,26 +101,26 @@ const getVoicemail = () => {
           })
         }
         voicemessageId = conversations[0].id;
+        console.log(voicemessageId)
         getVoicemailUrl(voicemessageId);
       });
     });
     req.end();
+  }
 
-    // console.log(voicemessageId);
-  // return conversations;
-  }  
-  
   // auth request
-  const req = http.request(options, (res) => {
-    const chunks = [];
-    res.on('data', (chunk) => chunks.push(chunk));
-    res.on('end', () => {
-      const body = JSON.parse(Buffer.concat(chunks));
-      makeNextRequest(body);
-    });
-  })
-  req.write(querystring.stringify({grant_type: 'client_credentials'}));
-  req.end();
+  // const req = http.request(options, (res) => {
+  //   const chunks = [];
+  //   res.on('data', (chunk) => chunks.push(chunk));
+  //   res.on('end', () => {
+  //     const body = JSON.parse(Buffer.concat(chunks));
+  //     console.log(body)
+  //     makeNextRequest(body);
+  //   });
+  // })
+  // req.write(querystring.stringify({grant_type: 'client_credentials'}));
+  // req.end();
+  getMessageId();
 }
-// getVoicemail();
-module.exports={ getVoicemail, conversations};
+getVoicemail();
+module.exports = { getVoicemail };
