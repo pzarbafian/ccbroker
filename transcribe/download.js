@@ -1,22 +1,8 @@
 require('dotenv').config();
 const fetch = require('node-fetch');
-const transcript_id = require('./upload')
+const fs = require('fs');
 const download = () => {
-
-  // let args = process.argv.slice(2);
-  let id = transcript_id;
-  // let id = args[0];
-  const url = `https://api.assemblyai.com/v2/transcript/${id}`;
-  
-  const params = {
-    headers: {
-      "authorization": process.env.ASSEMBLYAI_API_KEY,
-      "content-type": "application/json",
-    },
-    method: 'GET'
-  };
-  
-  
+  let transcribeIds = [];
   function print(data) {
     switch (data.status) {
       case 'queued':
@@ -32,15 +18,40 @@ const download = () => {
         break;
     }
   }
-  
-  fetch(url, params)
-    .then(response => response.json())
-    .then(data => {
-      print(data);
+  if (fs.existsSync('ids.json')) {
+    fs.readFile('ids.json', (err, data) => {
+      if (err) {
+        return console.log(err);
+      }
+      transcribeIds = [...JSON.parse(data).ids]
+      console.log(transcribeIds)
+      for (const transcript_id of transcribeIds) {
+        // let args = process.argv.slice(2);
+        let id = transcript_id;
+        // let id = args[0];
+        const url = `https://api.assemblyai.com/v2/transcript/${id}`;
+    
+        const params = {
+          headers: {
+            "authorization": process.env.ASSEMBLYAI_API_KEY,
+            "content-type": "application/json",
+          },
+          method: 'GET'
+        };
+        fetch(url, params)
+          .then(response => response.json())
+          .then(data => {
+            print(data);
+            console.log("helooooooooooo")
+          })
+          .catch((error) => {
+            console.error(`Error: ${error}`);
+          });
+      }
+    
     })
-    .catch((error) => {
-      console.error(`Error: ${error}`);
-    });
+  
+}
 }
 download();
 module.exports = { download }
