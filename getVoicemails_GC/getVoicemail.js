@@ -1,10 +1,11 @@
 const https = require('https');
 const fs = require('fs');
 const platformClient = require("purecloud-platform-client-v2");
+require('dotenv').config();
 const client = platformClient.ApiClient.instance;
 const conversations = [];
 let voicemessageId = "";
-const access_token = "VXYcN3BTCbNLwf-PwnhpV9cuJuVLyw5Ur3Po-bRip7mdPyW_1G_i9X7_V5S44L8xAcrL3xBw8BQbFA9sb1-f1Q";
+const access_token = process.env.ACCESS_TOKEN;
 const voicemailUris = [];
 const getVoicemail = () => {
   const getVoicemailUrl = (voicemessageId) => {
@@ -53,14 +54,14 @@ const getVoicemail = () => {
     // Manually set auth token or use loginImplicitGrant(...) or loginClientCredentialsGrant(...)
     client.setAccessToken(access_token);
   let apiInstance = new platformClient.VoicemailApi();
-  let queueId = "b8544dae-74dd-4c0f-b4bb-c3b3d2992558"; // String | Queue ID
+  let queueId = process.env.QUEUE_ID; // String | Queue ID
   let opts = { 
     'pageSize': 25, // Number | Page size
     'pageNumber': 1 // Number | Page number
   };
   apiInstance.getVoicemailQueueMessages(queueId, opts)
     .then((data) => {
-      console.log(`getVoicemailQueueMessages success! data: ${JSON.stringify(data.entities[0], null, 2)}`);
+      // console.log(`getVoicemailQueueMessages success! data: ${JSON.stringify(data.entities[0], null, 2)}`);
       for (const entity of data.entities) {
         conversations.push({
           id: entity.id,
@@ -70,7 +71,7 @@ const getVoicemail = () => {
         })
       }
       voicemessageId = conversations[0].id;
-      console.log(voicemessageId)
+      // console.log(voicemessageId)
       getVoicemailUrl(voicemessageId);
     })
     .catch((err) => {
