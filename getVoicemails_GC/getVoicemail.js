@@ -1,48 +1,22 @@
-const http = require("https");
 const https = require('https');
-// const querystring = require('querystring');
 const fs = require('fs');
 const platformClient = require("purecloud-platform-client-v2");
-const { upload } = require("../transcribe/upload");
 const client = platformClient.ApiClient.instance;
 const conversations = [];
 let voicemessageId = "";
-let token_type = "";
-let access_token = "";
+const access_token = "VXYcN3BTCbNLwf-PwnhpV9cuJuVLyw5Ur3Po-bRip7mdPyW_1G_i9X7_V5S44L8xAcrL3xBw8BQbFA9sb1-f1Q";
 const voicemailUris = [];
 const getVoicemail = () => {
-  const clientId = "00cd1850-dfa8-4312-a314-48e7b728429f";
-  const clientSecret = "pDViNxJlLaNOgdv29pUwH07XXIckK4KAEcTfiLWoH24";
-  const authUri = "login.cac1.pure.cloud";
-  const apiUri = "api.cac1.pure.cloud";
-
-  const options = {
-    'method': 'POST',
-    'hostname': authUri,
-    'port': null,
-    'path': '/oauth/token',
-    'headers': {
-      'authorization': 'Basic ' + Buffer.from(clientId + ':' + clientSecret).toString('base64'),
-      'content-type': 'application/x-www-form-urlencoded'
-    }
-  }
-  //api call
-
   const getVoicemailUrl = (voicemessageId) => {
-    const access_token = "lsxXkMiOcGjHKH1JVfejLHcdKGWAzWVI0CE-CoetIPyhWzcLASq_3TSbREtA4Cl1bFzVxVjuk5OaBMFV4Db-Ow"
     client.setEnvironment(platformClient.PureCloudRegionHosts.ca_central_1); // Genesys Cloud region
-
-    // Manually set auth token or use loginImplicitGrant(...) or loginClientCredentialsGrant(...)
+      // Manually set auth token or use loginImplicitGrant(...) or loginClientCredentialsGrant(...)
     client.setAccessToken(access_token);
-
-
     let apiInstance = new platformClient.VoicemailApi();
-
+    console.log("messageIsd= ", voicemessageId)
     let messageId = voicemessageId; // String | Message ID
     let opts = {
       "formatId": "WAV" // String | The desired media format.
     };
-
     // Get media playback URI for this voicemail message
     apiInstance.getVoicemailMessageMedia(messageId, opts)
       .then((data) => {
@@ -55,12 +29,10 @@ const getVoicemail = () => {
         console.log("There was a failure calling getVoicemailMessageMedia");
         console.error(err);
       });
-
     return true
   }
 
   const downloadVoicemail = (url) => {
-
     https.get(url, resp => resp.pipe(fs.createWriteStream(`voicemails/${voicemessageId}.WAV`)));
     fs.readFile('voicemails.json', (err, data) => {
       const voicemails = JSON.parse(data);
@@ -76,51 +48,37 @@ const getVoicemail = () => {
 
   }
 
-  const getMessageId = (body) => {
-    // token_type = body.token_type;
-    // access_token = body.access_token;
-    access_token = 'lsxXkMiOcGjHKH1JVfejLHcdKGWAzWVI0CE-CoetIPyhWzcLASq_3TSbREtA4Cl1bFzVxVjuk5OaBMFV4Db-Ow';
-    options.method = 'GET',
-      options.hostname = apiUri,
-      options.path = '/api/v2/voicemail/queues/b8544dae-74dd-4c0f-b4bb-c3b3d2992558/messages',
-      options.headers = {
-        'authorization': 'bearer' + ' ' + access_token,
-        'content-type': 'application/json'
+  const getMessageId = () => {
+    client.setEnvironment(platformClient.PureCloudRegionHosts.ca_central_1); // Genesys Cloud region
+    // Manually set auth token or use loginImplicitGrant(...) or loginClientCredentialsGrant(...)
+    client.setAccessToken(access_token);
+  let apiInstance = new platformClient.VoicemailApi();
+  let queueId = "b8544dae-74dd-4c0f-b4bb-c3b3d2992558"; // String | Queue ID
+  let opts = { 
+    'pageSize': 25, // Number | Page size
+    'pageNumber': 1 // Number | Page number
+  };
+  apiInstance.getVoicemailQueueMessages(queueId, opts)
+    .then((data) => {
+      console.log(`getVoicemailQueueMessages success! data: ${JSON.stringify(data.entities[0], null, 2)}`);
+      for (const entity of data.entities) {
+        conversations.push({
+          id: entity.id,
+          conversation: entity.conversation,
+          caller: entity.callerAddress,
+          date: entity.createdDate
+        })
       }
-    const req = http.request(options, (res) => {
-      const chunks = [];
-      res.on('data', (chunk) => chunks.push(chunk));
-      res.on('end', () => {
-        const body = JSON.parse(Buffer.concat(chunks));
-        for (const entity of body.entities) {
-          conversations.push({
-            id: entity.id,
-            conversation: entity.conversation,
-            caller: entity.callerAddress,
-            date: entity.createdDate
-          })
-        }
-        voicemessageId = conversations[0].id;
-        console.log(voicemessageId)
-        getVoicemailUrl(voicemessageId);
-      });
+      voicemessageId = conversations[0].id;
+      console.log(voicemessageId)
+      getVoicemailUrl(voicemessageId);
+    })
+    .catch((err) => {
+      console.log('There was a failure calling getVoicemailQueueMessages');
+      console.error(err);
     });
-    req.end();
   }
-
-  // auth request
-  // const req = http.request(options, (res) => {
-  //   const chunks = [];
-  //   res.on('data', (chunk) => chunks.push(chunk));
-  //   res.on('end', () => {
-  //     const body = JSON.parse(Buffer.concat(chunks));
-  //     console.log(body)
-  //     makeNextRequest(body);
-  //   });
-  // })
-  // req.write(querystring.stringify({grant_type: 'client_credentials'}));
-  // req.end();
   getMessageId();
 }
-getVoicemail();
+
 module.exports = { getVoicemail };
