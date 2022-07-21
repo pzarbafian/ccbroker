@@ -1,5 +1,5 @@
 const platformClient = require('purecloud-platform-client-v2');
-var WebSocketClient = require('websocket').client;
+const WebSocketClient = require('websocket').client;
 const client = platformClient.ApiClient.instance;
 const voice = require('./getVoicemail')
 require('dotenv').config();
@@ -8,7 +8,6 @@ require('dotenv').config();
 const CLIENT_ID = process.env.GENESYS_CLOUD_CLIENT_ID;
 const CLIENT_SECRET = process.env.GENESYS_CLOUD_CLIENT_SECRET;
 const ORG_REGION = process.env.GENESYS_CLOUD_REGION; // eg. us_east_1
-
 const websocketClient = new WebSocketClient();
 // API instances
 const notificationsApi = new platformClient.NotificationsApi();
@@ -30,7 +29,6 @@ websocketClient.on('connect', connection => {
             let voicemail = conversation.participants
                             .filter(p => p.purpose == 'voicemail')[0];
             // Some messages based on events that are happening on the queue
-            // console.log(customer)
             if(customer && !voicemail){
                 console.log(`Customer ${customer.id} is waiting on queue.`);
             }
@@ -42,7 +40,6 @@ websocketClient.on('connect', connection => {
                     disconnected = true;
             }
         }
-
         
         // For heartbeats
         if(topic == 'channel.metadata'){
@@ -53,9 +50,7 @@ websocketClient.on('connect', connection => {
             console.log("Heart Beat")
         }
     });
-   
 });
-
 
 websocketClient.on('connectFailed', function(error) {
     console.log('Connect Error: ' + error.toString());
@@ -66,17 +61,13 @@ const environment = platformClient.PureCloudRegionHosts[ORG_REGION];
 if(environment) client.setEnvironment(environment);
 
 // Log in with Client Credentials
-
 client.loginClientCredentialsGrant(CLIENT_ID, CLIENT_SECRET)
 .then(() => {
     console.log('Authentication successful');
-
-
     return notificationsApi.postNotificationsChannels()
 })
 .then(data => {
     console.log('Channel created');
-
 
     let websocketUri = data.connectUri;
     let channelId = data.id;
@@ -88,10 +79,8 @@ client.loginClientCredentialsGrant(CLIENT_ID, CLIENT_SECRET)
 })
 .then(data => {
     console.log('Subscribed to Queue');
-
 })
 .catch(e => console.error(e));
-
 
 // NOTE: This next line is a simple way to make sure the app runs 'forever'
 // In production you'd want the actual code running as a process/service
