@@ -46,7 +46,6 @@ const getVoicemail = () => {
       fs.writeFileSync('voicemails.json', JSON.stringify(voicemails), (err, data) => {
       })
     });
-
   }
 
   const getMessageId = () => {
